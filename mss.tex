@@ -4,9 +4,9 @@
 
 \addbibresource{mss.bib}
 
-\newcommand{\authorname}{Ernest P. Worrell}
-\newcommand{\authorpatp}{\patp{sampel-palnet}}
-\newcommand{\affiliation}{Kamp Kikakee}
+\newcommand{\authorname}{N. E. Davis}
+\newcommand{\authorpatp}{\patp{lagrev-nocfep}}
+\newcommand{\affiliation}{Urbit Foundation}
 
 %  Make first page footer:
 \fancypagestyle{firststyle}{%
@@ -23,11 +23,11 @@
 %  Arrange subsequent pages:
 \fancyhf{}
 \fancyhead[LE]{{\urbitfont Urbit Systems Technical Journal}}
-\fancyhead[RO]{Floating-Point Arithmetic on Deterministic Systems}
+\fancyhead[RO]{{\emph Trusting Trust} on Mars}
 \fancyfoot[LE,RO]{\thepage}
 
 %%MANUSCRIPT
-\title{Ernest Goes to Mars:  An Enquiry into the Foundations of Artificial Stupidity}
+\title{{\emph Trusting Trust} on Mars: \\ Thoughts on Urbit Security}
 \author{\authorname~\authorpatp \\ \affiliation}
 \date{}
 
@@ -37,7 +37,7 @@
 \thispagestyle{firststyle}
 
 \begin{abstract}
-In this groundbreaking paper, we embark on a cosmic journey with the renowned character Ernest P. Worrell as he ventures into the unexplored realm of Martian computing. Drawing inspiration from Ernest's comically ingenious encounters with everyday challenges, we investigate the foundations of what we term "Artificial Stupidity." As Ernest grapples with Martian technology, we delve into the intricacies of programming errors, algorithmic missteps, and the curious phenomena that arise when human-like intelligence meets extraterrestrial computing systems. Our analysis sheds light on the unexpected intersections between humor, artificial intelligence, and the cosmic absurdity of Martian software. Join us in this interplanetary exploration as we unravel the mysteries of Artificial Stupidity through the lens of Ernest's interstellar escapades.
+Via Ken Thompson's classic reflections on compiler safety and the injection of “undetectable” and irreversible malicious bugs into binaries, we analyze aspects of the security of Urbit as a two-level executable system.
 \end{abstract}
 
 % We will adjust page numbering in final editing.
@@ -48,70 +48,209 @@ In this groundbreaking paper, we embark on a cosmic journey with the renowned ch
 
 \section{Introduction}
 
-Introduce the scope of your article and investigation.
+Ken Thompson's famous 1983 Turing Award lecture, “Reflections on Trusting Trust” \citep{Thompson1984}, concisely illustrated a fundamental difficulty with reposing confidence in any software stack one has not built oneself from assembler code.  He postulated a compiler which had been modified to match a particular pattern and inject malicious code (such as a login backdoor or privilege escalation) into any program it produced; and a more insidious scenario in which the compiler knows to change its own source upon compilation to perpetuate the backdoor attack forwards.  His exposition proceeded from the production of a quine, to a learning compiler, to the malicious “trusting trust” attack.  The (non)solution Thompson proposed as epitome, “you can't trust code that you did not totally create yourself,” was cold comfort to the computer security expert.\footnote{Indeed, Forth has been employed as a clean bootstrap platform since it can be implemented straightforwardly in machine language on many target embedded architectures.  This is more for pragmatism than security, but the possibility of employing this as a strict security measure exists.}
 
-\section{Background and Literature}
+Each component of the trusting trust attack can be demonstrated in Hoon and to some extent in Arvo.  Countermeasures and implications for the overall security of the Urbit stack are also considered.
 
-Exposite the relevant background and literature.
+% https://www.cs.cmu.edu/~rdriley/487/papers/Thompson_1984_ReflectionsonTrustingTrust.pdf
+% https://dl.acm.org/doi/10.1145/358198.358210
+% https://web.stanford.edu/class/cs208e/cgi-bin/main.cgi/static/lectures/18-ReflectionsOnTrustingTrust/ReflectionsOnTrustingTrust.pdf
 
-\begin{enumerate}
-  \item  Prefer to \texttt{enumerate}.
-  \item  It is easier to refer to than \texttt{itemize}.
-\end{enumerate}
+\section{Nock Quines}
 
-\noindent
-Mark \texttt{\textbackslash noindent} in paragraphs that continue the thought of an \texttt{\textbackslash enumerate} block.
+A quine is an example of a code program that produces its own source; it is a fixed point of its syntax and execution.  Some languages make this relatively straightforward, particularly those with rich string syntax.  As Wikipedia states, “quines are possible in any Turing-complete programming language, as a direct consequence of Kleene's recursion theorem”; an older version of the same page emphasizes the utility of the ability to output a computable string.
 
-\section{Urbit's Implementation}
+Nock operates by applying a formula against a subject.  The subject–formula pair is reduced by the first matching pattern from the left.  A strict quine has no input, however, for Nock a formula is a partial function that must be evaluated against a subject.  We must reconcile the subject as a context but not an input, as it were.  A proper Nock quine therefore includes both, and replication of the subject–formula pair should be a requirement for a true quine.
 
-Oftentimes you will then turn to exploring how Urbit or closely related systems like Nockchain have approached or considered a problem.  You can look at a PR like \citetpr{urbit_urbit_6891}.
+The trivial Nock quine is \lstinline[style=inlinecode]{.*([[0 1] 0 1] [[0 1] 0 1])}, simply an address replication using the Nock 0 operator.\footnote{I am indebted to \patp{dozreg-toplud} for first bringing this simple quine to my attention.}  Indeed, this suggests a family of quines built on tree structure replication; \patp{pinhul-radlyr} suggested the following:\footnote{\url{https://github.com/jpt4/icfp2024code/blob/main/quine.rkt}}
 
-\lstset{language=C}
-\begin{lstlisting}
-#include <stdio.h>
-
-double compute(float a, float b) {
-    return a * a + b * b;
-}
-
-int main() {
-    float x = 2.5;
-    float y = 3.7;
-
-    double result = compute(x, y);
-
-    printf("Result: %lf\n", result);
-
-    return 0;
-}
+\begin{lstlisting}[style=listingcode]
+[[[0 1] [[0 2] [0 3]]] [[0 1] [[0 2] [0 3]]]]
 \end{lstlisting}
 
 \noindent
-That code snippet was part of the text, and not a standalone entity to which we make separate repeated reference.
+and the recursive generalization is straightforward.  Following \citeauthor{Thompson1984}, we may consider such a quine to be a “compiler” in that it produces a program from a program.
 
-\begin{figure}
-  \begin{lstlisting}[language=Python, caption={Example Python Code}, label={lst:example}]
-  def hello_world():
-      print("Hello, world!")
-  \end{lstlisting}
-\end{figure}
+http://www.madore.org/~david/computers/quine.html#sec_selfint
+https://erichokanson.me/category/quine-programs/
 
-Refer to the code listing: Listing~\ref{lst:example}.  (Note that we don't suppress indentation since it's a float.)
+\section{A Nock Learning Compiler}
+
+\section{Malicious Nock}
+
+\section{Hoon Equivalents}
+
+To some extent, Hoon as a macro language over Nock obviates the strict need for quine construction to demonstrate the applicable principles.  Furthermore, a number of definitions should be considered:  a Hoon quine could be assessed against either the resulting AST (sugared or reduced) or the plain text source.
 
 
-\section{A Wild Ernest Appears}
+Another relatively unexplored avenue is to have formula manipulate the rules themselves.  This is straightforward in raw Nock, if a little difficult to conceptualize, although it is impossible in Hoon.
 
-You can have as many sections as make sense.  Only sections and subsections appear in the table of contents.
+/~ in cold state playback?
+Since a Nock formula is a partial function, a Hoon should be considered as a hypotactic language.  That is, each expression is a phrase subordinated to its subject.
 
-\section{Conclusion}
 
-To summarize, why did you write it?  Why do we care?  What impact should it have on Urbit development?
+\section{Attacks in Urbit}
 
-Your bibliography is a separate BibTeX file.  We use the \texttt{plainnat} bibliography style.  You can use \texttt{natbib} citation commands like \texttt{\textbackslash citep\{wikipedia\}} for parenthesized references.  Use \texttt{\textbackslash citet\{wikipedia\}} for inline references.  You can also use \texttt{\textbackslash citeauthor\{wikipedia\}} for the principal author's name.
+Nock and Hoon are homoiconic:  code and data share the same representation.  This facilitates code distribution over Urbit's Ames network, wherein code is transmitted as a raw noun (nominally in Hoon) and then built using local mark conversion, parsing, and compiler routines.  The local ship controls its own build process rather than accepting unknown Nock nouns, permitting the source code to be inspected (often in abbreviated form by comparing “desk hashes” or hashes of the contents of a distributed branch) prior to installation.\footnote{In practice, we observe that the relatively high trust of the Urbit community has led to the hash being used as a version identifier rather than a cursory security check.}  This suggests at least three different attack vectors for Hoon code:
 
-``You can use traditional TeX---or LaTeX---representations'' \citep{Varney1987}.
+\begin{enumerate}
+  \item  Malicious source.
+  \item  False signatures.
+  \item  Compromised compiler.
+\end{enumerate}
 
-“Or you can use fancy quotes—and symbols.”
+\noindent
+Each of these could be perpetrated by the last:  the idea of a compromised compiler trumps all bets for a program, and thus prompted Thompson's initial reflections.
 
+\subsection{Malicious source}
+
+The trivial instance of sending code that 
+
+Hoon is moderately robust against overloading the compiler
+virus exploits
+
+Example
+
+\subsection{Signature falsification}
+
+A noun hash is a cryptographic hash of a noun.  Specifically, the SHA-256 \lstinline[style=inlinecode]{++shax} of an atom is typically used, or for cell structures the noun is first \lstinline[style=inlinecode]{++jam}med into an atom before a SHA-128 \lstinline[style=inlinecode]{++shaf} is applied.  Noun hashes are used extensively in Arvo and the vanes to identify values in caches and to compare nouns for equality.
+
+In principle, signature falsification could lead to invalid cache retrievals, e.g. invoking a malicious gate instead of the intended one.  In practice, userspace code does not have any direct access to the Arvo caches, meaning that while signatures could be falsified, this would require a kernel-level or runtime-level compromise of the system.
+
+\paragraph{Ames packet signature falsification}
+Over the wire, there are two significant kinds of risky false signatures:  signed Ames packet or faked desks.  An Ames communication takes place as a message is decomposed into 1 kB or smaller packets, each of which is sequentially numbered and signed.  All packets are signed using SHA-256 encryption.\footnote{“Every packet sent between ships is encrypted except for self-signed attestation packets from 128-bit comets” (“Ames  Overview”).}  On the other end, the packets are received in a queue before being reassembled into the original message.  We consider three different signature attacks:
+
+\begin{enumerate}
+  \item  Falsifying a packet signature.  To simply falsify a signature, one would have to falsify the private key of the sender, which is a significant cryptographic challenge.
+  \item  Spoofing a packet signature.  A locally compromised runtime could inject a spurious packet matching some hypothetical external ship.  This attack is of commensurate difficulty to a simply falsified signature.
+  \item  Permitting a false signature.  A compromised Ames vane could maliciously permit a message with a false signature, perhaps activated by the signature itself.  This scenario seems the most tractable for a hacker to exploit.
+\end{enumerate}
+
+In practice, packet reassembly takes place in the runtime, which introduces another attack surface for these Ames packet signature falsification attacks.
+
+\paragraph{Desk (Clay) signature falsification}
+A desk hash, used as an informal check,\footnote{\lstinline[style=inlinecode]{(shax (jam +<))}, where the referent is a list of commits.} is a signature from the contents of the desk.  
+
+We may dismiss the problem of directly producing a malicious source desk that hashes to the same value as a highly nontrivial expenditure of compute resources.  In addition, should such an attack come into currency, the hash algorithm could easily be traded for a more complicated and secure one.  For a zero-day exploit utilizing the distribution of a compromised desk, prior art suggests that on the order of $2^{63.1}$ SHA operations would be required to construct a collision \citep{Stevens2017}.  (Successfully execution would then require that the malicious desk actually contains malicious code, which further complicates the problem space.)
+% Stevens, Marc; Bursztein, Elie; Karpman, Pierre; Albertini, Ange; Markov, Yarik (2017). Katz, Jonathan; Shacham, Hovav (eds.). The First Collision for Full SHA-1 (PDF). Advances in Cryptology – CRYPTO 2017. Lecture Notes in Computer Science. Vol. 10401. Springer. pp. 570–596. doi:10.1007/978-3-319-63688-7_19. ISBN 9783319636870. Archived from the original (PDF) on May 15, 2018. Retrieved February 23, 2017.
+% https://web.archive.org/web/20180515222208/http://shattered.io/static/shattered.pdf
+
+As with the Ames packet signature falsification, it is more likely for malicious desk distribution to succeed via a special-cased desk than by a hash collission.  This has an inception problem, of course, since the \lstinline[style=inlinecode]{%base} desk must be likewise modified (or the threshold attack described below used).
+
+https://en.wikipedia.org/wiki/SHA-1#SHAttered_%E2%80%93_first_public_collision
+
+\subsection{Compromised compiler}
+
+Example
+
+What would a compromised compiler look like?
+
+\section{Attacks in Nock}
+
+Urbit does not directly distribute Nock code as executable nouns today.  Any practical attacks based on Nock would require distributing the malicious Nock code as data or inducing a Hoon compiler to produce the malicious Nock code inadvertently.  Such compromised code would then have to executed against an appropriate subject to produce the desired malicious consequence.
+
+Self-modifying Nock code is obviously a concern for reasons similar to 
+
+% [%4 0 1] thing to change commands but can fix using constants?
+
+The Hoon examples above do not
+
+Nock Two
+
+
+\section{Attacks in the Runtime}
+
+Nock is an interpreted language which is evaluated on some particular virtual machine layer.  As of this writing, there are many Nock interpreters \cite{Nock2023} but only two fully instrumented Nock runtimes, Vere and Ares.  Vere is written in C and utilizes a few third-party libraries statically linked into the binary, such as \texttt{libuv}.  Ares is composed in Rust and similarly statically links its modules.  Per the concerns raised by Thompson about a program produced by a compromised compiler, the runtime could in principle be modified to run malicious code either independently of the Arvo instance or in response to side effects induced by the Arvo instance.
+
+The colloquial wisdom among the Urbit developer community is that if one loses administrative control of one's box (the machine executing the Urbit process), one is already pwned.\footnote{A related problem is that of the security of Azimuth as a public key infrastructure, but we do not address this line of enquiry in this treatment.}  This is saliently illustrated by the Trusting Trust compiler issue, but of course there are less subtle and more
+
+signing
+
+attested enclaves
+
+There is a particular threshold attack which we must consider in detail:  the injection of a Nock Eleven flag (with no Hoon side effects, rather like C \texttt{#pragma}s) that nevertheless triggers exfiltration of sensitive information from the running Arvo instance.  The compromise can be in the runtime but the trigger comes from the Arvo side.
+
+The most salient attack vector on an Urbit ship, of course, is to compromise the cryptography:  emit the private key or enough information for an observer to deduce the key.
+
+
+As Urbit moves towards automated update processes, such as acquiring and booting into new runtimes directly, secure control over the stack—including the build—will assume new prominence.  We hope these reflections will spur more careful consideration of the dangers inherent in running and securing not only Urbit but in fact any computing stack.  Fortunately, proper use of Urbit (including building one's own runtime binary and checking various hashes proactively) can and should make the likelihood of a trusting trust attack as low as possible, since each check in the process makes it increasingly more difficult to propagate malicious code from previous steps correctly.\tombstone{}
+
+---
+
+ford is mostly just some invocations of the hoon compiler, some vase-mode operations to modify or combine outputs from the hoon compiler, and caching (because the hoon compiler is slow
+
+we plan to replace the explicit caching with persistent memoization in the runtime, at which point ford will just be a (small) handful of (small) functions
+
+
+categories of quines
+
+Nock evaluation tends to consume values rather than produce them, leading to a naïve difficulty in producing expressions of the same total length as the subject/formula source.  Furthermore, without strings or reentrancy, Nock is not particularly amenable to the easiest methods of quine construction; one popular approach involves string expression replacement.
+% http://www.madore.org/~david/computers/quine.html
+% https://towardsdatascience.com/how-to-write-your-first-quine-program-947f2b7e4a6f
+%  https://archive.is/TGLcp
+
+This suggests that the approach should focus on rules that tend to expand the expression:
+
+\begin{enumerate}
+  \item  Implicit consing results in a longer expression.  \texttt{*[a [b c] d] → [*[a b c] *[a d]]}
+  \item  The stack push rule, Nock Eight, produces an expanded subject for evaluation.  \texttt{*[a 8 b c] → *[[*[a b] a] c]}
+  \item  The edit rule, Nock Ten, propagates the subject into the result.  \texttt{*[a 10 [b c] d] → #[b *[a c] *[a d]]}
+\end{enumerate}
+
+% A common trick is to _jump start_ the quine by writing a program to read a textfile and output an array of numbers. Then you modify it to use a static array, and run the first program against the new (static array) program, producing an array of number that represents the program. Insert that into the static array, run it again until it settles down, and that gets you a quine. _But_, it's tied to a specific character set (== not 100% portable). A program like the above (and not the classic _printf_ hack) will work the same on ASCII or EBCDIC (the classic _printf_ hack fails in EBCDIC because it contains hard-coded ASCII).
+
+[a 8 b c]
+[[a b] a c]
+*[a [b c] d] → *[[a b c] *[a d]]
+a=[0 1]
+b=[2]
+c=[3 0 1]
+d=[4]
+*[[0 1] [2 3 0 1] 4] → *[[[0 1] 2 3 0 1] 0 1 4]
+
+
+
+*[a 11 [b c] d]     *[[*[a c] *[a d]] 0 3]
+a=a
+b=b
+c=[11 b]
+d=[0 3]
+*[[*[a 11 b] *[a 0 3]] 0 3]
+
+     ((lambda (x)
+       (list x (list (quote quote) x)))
+      (quote
+         (lambda (x)
+           (list x (list (quote quote) x)))))
+
+
+\begin{lstlisting}
+> !=(=/(a 1 |.(\$(a 1))))
+[8 [1 1] [1 9 2 10 [6 1 1] 0 1] 0 1]
+> .*([8 [1 1] [1 9 2 10 [6 1 1] 0 1]] [0 1])
+[8 [1 1] 1 9 2 10 [6 1 1] 0 1]
+> .*([8 [1 1] [1 9 2 10 [6 1 1] 0 1]] [0 1])
+[8 [1 1] 1 9 2 10 [6 1 1] 0 1]
+> .*(. \8 [1 1] [1 9 2 10 [6 1 1] 0 1] [0 1]])
+\end{lstlisting}
+
+(setq Q '(lambda (x y) x))
+(setq s11 '(lambda (f x) (list 'lambda '(y) (list f x 'y))))
+(setq n (list 'lambda '(x y) (list Q (list s11 'x 'x) 'y)))
+(setq p (eval (list s11 n n)))
+
+=/  id  |=([x=* y=*] x)
+=/  s11=gate  |=([f=gate x=*] |=(y=* (f x y)))
+=/  n  |=([x=* y=*] (id (s11 x x) y))
+=/  p  (s11 n n)
+(p ~)
+
+A point of evaluation must be decided upon, since a Nock formula that produced an active quine would evaluate forever.
+
+Depending on definitions, one trivial quine is the formula \texttt{[0 1]}, which produces whatever subject it has been handed.
+
+
+
+\selectlanguage{USenglish}
 \printbibliography
 \end{document}
