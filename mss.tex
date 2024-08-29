@@ -23,11 +23,11 @@
 %  Arrange subsequent pages:
 \fancyhf{}
 \fancyhead[LE]{{\urbitfont Urbit Systems Technical Journal}}
-\fancyhead[RO]{{\emph Trusting Trust} on Mars}
+\fancyhead[RO]{\emph{Trusting Trust} on Mars}
 \fancyfoot[LE,RO]{\thepage}
 
 %%MANUSCRIPT
-\title{{\emph Trusting Trust} on Mars: \\ Thoughts on Urbit Security}
+\title{\emph{Trusting Trust} on Mars: \\ Thoughts on Urbit Security}
 \author{\authorname~\authorpatp \\ \affiliation}
 \date{}
 
@@ -37,7 +37,7 @@
 \thispagestyle{firststyle}
 
 \begin{abstract}
-Via Ken Thompson's classic reflections on compiler safety and the injection of “undetectable” and irreversible malicious bugs into binaries, we analyze aspects of the security of Urbit as a two-level executable system.
+Via Ken Thompson's classic reflections on compiler safety and the injection of “undetectable” and irreversible malicious bugs into binaries, we analyze aspects of the security of Urbit as a two-level executable system, i.e. as a virtualized machine running on an execution layer.
 \end{abstract}
 
 % We will adjust page numbering in final editing.
@@ -48,13 +48,9 @@ Via Ken Thompson's classic reflections on compiler safety and the injection of �
 
 \section{Introduction}
 
-Ken Thompson's famous 1983 Turing Award lecture, “Reflections on Trusting Trust” \citep{Thompson1984}, concisely illustrated a fundamental difficulty with reposing confidence in any software stack one has not built oneself from assembler code.  He postulated a compiler which had been modified to match a particular pattern and inject malicious code (such as a login backdoor or privilege escalation) into any program it produced; and a more insidious scenario in which the compiler knows to change its own source upon compilation to perpetuate the backdoor attack forwards.  His exposition proceeded from the production of a quine, to a learning compiler, to the malicious “trusting trust” attack.  The (non)solution Thompson proposed as epitome, “you can't trust code that you did not totally create yourself,” was cold comfort to the computer security expert.\footnote{Indeed, Forth has been employed as a clean bootstrap platform since it can be implemented straightforwardly in machine language on many target embedded architectures.  This is more for pragmatism than security, but the possibility of employing this as a strict security measure exists.}
+Ken Thompson's famous 1983 Turing Award lecture, ``Reflections on Trusting Trust'' \citep{Thompson1984}, concisely illustrated a fundamental difficulty with reposing confidence in any software stack one has not built oneself from assembler code.  He postulated a compiler which had been modified to match a particular pattern and inject malicious code (such as a login backdoor or privilege escalation) into any program it produced; and a more insidious scenario in which the compiler knows to change its own source upon compilation to perpetuate the backdoor attack forwards.  His exposition proceeded from the production of a quine, to a learning compiler, to the malicious ``trusting trust'' attack.  The (non)solution Thompson proposed as epitome, ``you can't trust code that you did not totally create yourself,'' was cold comfort to the computer security expert.\footnote{Indeed, Forth has been employed as a clean bootstrap platform since it can be implemented straightforwardly in machine language on many target embedded architectures.  This is more for pragmatism than security, but the possibility of employing this as a strict security measure exists.}
 
-Each component of the trusting trust attack can be demonstrated in Hoon and to some extent in Arvo.  Countermeasures and implications for the overall security of the Urbit stack are also considered.
-
-% https://www.cs.cmu.edu/~rdriley/487/papers/Thompson_1984_ReflectionsonTrustingTrust.pdf
-% https://dl.acm.org/doi/10.1145/358198.358210
-% https://web.stanford.edu/class/cs208e/cgi-bin/main.cgi/static/lectures/18-ReflectionsOnTrustingTrust/ReflectionsOnTrustingTrust.pdf
+Each component of the trusting trust attack can be demonstrated in Nock or Hoon and to some extent realized in Arvo.  Countermeasures and implications for the overall security of the Urbit stack are also considered.
 
 \section{Nock Quines}
 
@@ -62,36 +58,58 @@ A quine is an example of a code program that produces its own source; it is a fi
 
 Nock operates by applying a formula against a subject.  The subject–formula pair is reduced by the first matching pattern from the left.  A strict quine has no input, however, for Nock a formula is a partial function that must be evaluated against a subject.  We must reconcile the subject as a context but not an input, as it were.  A proper Nock quine therefore includes both, and replication of the subject–formula pair should be a requirement for a true quine.
 
-The trivial Nock quine is \lstinline[style=inlinecode]{.*([[0 1] 0 1] [[0 1] 0 1])}, simply an address replication using the Nock 0 operator.\footnote{I am indebted to \patp{dozreg-toplud} for first bringing this simple quine to my attention.}  Indeed, this suggests a family of quines built on tree structure replication; \patp{pinhul-radlyr} suggested the following:\footnote{\url{https://github.com/jpt4/icfp2024code/blob/main/quine.rkt}}
+The trivial Nock quine is
+\begin{lstlisting}[style=listingcode]
+[[0 1] 0 1] [[0 1] 0 1]
+\end{lstlisting}
+\noindent
+simply an address replication using the Nock 0 operator.\footnote{I am indebted to \patp{dozreg-toplud} for first bringing this simple quine to my attention.}  Indeed, this suggests a family of quines built on tree structure replication; \patp{pinhul-radlyr} suggested the following:\footnote{\url{https://github.com/jpt4/icfp2024code/blob/main/quine.rkt}}
 
 \begin{lstlisting}[style=listingcode]
 [[[0 1] [[0 2] [0 3]]] [[0 1] [[0 2] [0 3]]]]
 \end{lstlisting}
 
 \noindent
-and the recursive generalization is straightforward.  Following \citeauthor{Thompson1984}, we may consider such a quine to be a “compiler” in that it produces a program from a program.
+and the recursive generalization is straightforward.  Following \citeauthor{Thompson1984}, we consider such a quine to be a “compiler” in that it produces a program from a program.\footnote{Further articles of interest on producing quines have been provided by \href{http://www.madore.org/~david/computers/quine.html}{David Madore} and \href{https://erichokanson.me/category/quine-programs/}{Eric Hokanson}.}
 
-http://www.madore.org/~david/computers/quine.html#sec_selfint
-https://erichokanson.me/category/quine-programs/
+\section{A Learning Compiler}
 
-\section{A Nock Learning Compiler}
+\citeauthor{Thompson1984} proceeds from the notion of a quine to constructing a learning compiler, or a compiler that can modify the source of its successor in such a way as to extend the semantics of the language.
 
-\section{Malicious Nock}
+% To some extent, Hoon as a macro language over Nock obviates the strict need for quine construction to demonstrate the applicable principles.  Furthermore, a number of definitions should be considered:  a Hoon quine could be assessed against either the resulting AST (sugared or reduced) or the plain text source.
 
-\section{Hoon Equivalents}
+Although raw Nock is extremely uncommon in practice on Urbit, it is slightly more common to manipulate vase-mode values of Hoon and rather frequent to modify the Hoon compiler itself (at least in kernel development).  A modified Hoon compiler (let us call it ``+(Hoon)'') is capable of perpetuating language changes forward into the nouns resulting from source.  A simple example is adding an additional rune or altering the behavior of the parser (in \lstinline[style=inlinecode]{++vast}) or AST Nock compiler (in \lstinline[style=inlinecode]{++mint:ut}).  Given access to one's \lstinline[style=inlinecode]{%base} desk, the possible modifications are endless (Listing~\ref{fig:pattern}).
 
-To some extent, Hoon as a macro language over Nock obviates the strict need for quine construction to demonstrate the applicable principles.  Furthermore, a number of definitions should be considered:  a Hoon quine could be assessed against either the resulting AST (sugared or reduced) or the plain text source.
+\begin{lstlisting}[style=listingcode,
+                   label=fig:pattern,
+                   caption={A simple example of pattern-detecting adaptive code in Hoon and Nock.}]
+::  Hoon
+?:(=(- [2 3 4]) [2 3 5] -)
+::  Nock
+[6 [5 [0 2] 1 2 3 4] [1 2 3 5] 0 2]
+\end{lstlisting}
 
+Given control of a compiler, \citeauthor{Thompson1984} then proceeds to spring the trap:  ``a simple modification to the compiler that will deliberately miscompile source whenever a particular pattern is matched'' (p. 763).  That is, all code descended from the compromised compiler in his example may be considered contaminated by a self-perpetuating Trojan horse.
 
-Another relatively unexplored avenue is to have formula manipulate the rules themselves.  This is straightforward in raw Nock, if a little difficult to conceptualize, although it is impossible in Hoon.
+Urbit does not directly distribute Nock code as executable nouns today.  Any practical attacks based on Nock would require distributing the malicious Nock code as data or inducing a Hoon compiler to produce the malicious Nock code inadvertently.  Such compromised code would then have to executed against an appropriate subject to produce the desired malicious consequence.\footnote{Since a Nock formula is a partial function, Hoon should be considered as a hypotactic language.  That is, each expression is a phrase subordinated to its subject.  Crossover manipulations between the subject and formula are thus possible, as long as an iterated cycle of using a formula against a subject to produce a new subject is followed.}
 
-/~ in cold state playback?
-Since a Nock formula is a partial function, a Hoon should be considered as a hypotactic language.  That is, each expression is a phrase subordinated to its subject.
+Critically for Urbit, the Hoon compiler at any one state of the kernel is used to produce the next state.  ``Live'' code is not sent over the network:  one sends source files which are then compiled locally into executable Nock nouns.  Given such a compromised compiler, ``no amount of source-level verification or scrutiny will protect you from using untrusted code'' (\emph{ibid.}).  The trusting trust attack is complete and the system has been fundamentally compromised.
+
+Another relatively unexplored avenue is to have Nock formula manipulate the rules themselves.  Typically, Nock rules are treated as constants, and Hoon code that utilizes them often simply specifies them as such for legibility.  This is not necessary, however, and changing the rules this way is straightforward in raw Nock, if a little difficult to conceptualize (a Hoon example is provided in Listing~\ref{fig:rules}).  (This is salient in iterated cycles, a subject–formula pair yielding the next subject for subsequent formula evaluation.)
+
+\begin{lstlisting}[style=listingcode,
+                   label=fig:rules,
+                   caption={Hoon which can modify the rules of supplied Nock formulae arbitrarily.  For simplicity, lists are used when in practice it would be done in cells and tuples.}]
+=/  a=(list @)  [4 1 1 ~]
+=|  b=(list @)
+|-  ?~  a  (flop b)
+$(a t.a, b [?:(=(4 i.a) 3 i.a) b])
+\end{lstlisting}
 
 
 \section{Attacks in Urbit}
 
-Nock and Hoon are homoiconic:  code and data share the same representation.  This facilitates code distribution over Urbit's Ames network, wherein code is transmitted as a raw noun (nominally in Hoon) and then built using local mark conversion, parsing, and compiler routines.  The local ship controls its own build process rather than accepting unknown Nock nouns, permitting the source code to be inspected (often in abbreviated form by comparing “desk hashes” or hashes of the contents of a distributed branch) prior to installation.\footnote{In practice, we observe that the relatively high trust of the Urbit community has led to the hash being used as a version identifier rather than a cursory security check.}  This suggests at least three different attack vectors for Hoon code:
+Nock and Hoon are homoiconic:  code and data share the same representation.  This facilitates code distribution over Urbit's Ames network, wherein code is transmitted as a raw jammed noun (nominally in Hoon) and then built using local mark conversion, parsing, and compiler routines.  The local ship controls its own build process rather than accepting unknown Nock nouns, permitting the source code to be inspected (often in abbreviated form by comparing “desk hashes” or hashes of the contents of a distributed branch) prior to installation.\footnote{In practice, we observe that the relatively high trust of the Urbit community has led to the hash being used as a version identifier rather than a cursory security check.}  This suggests at least three different programmatic attack vectors for an Urbit ship:
 
 \begin{enumerate}
   \item  Malicious source.
@@ -100,21 +118,21 @@ Nock and Hoon are homoiconic:  code and data share the same representation.  Thi
 \end{enumerate}
 
 \noindent
-Each of these could be perpetrated by the last:  the idea of a compromised compiler trumps all bets for a program, and thus prompted Thompson's initial reflections.
+Each of these could be perpetrated by the last two:  the idea of a compromised compiler trumps all bets for a program, and thus prompted Thompson's initial reflections.
 
 \subsection{Malicious source}
 
-The trivial instance of sending code that 
+The most straightforward way to compromise a system is to simply send code that compromises a system in a particular way and induce the target to execute that code.  As Urbit code distribution is permissionless, the practical barriers to this are social and habitual:  most users prefer to treat the Urbit network as a high-trust society, and most users do not store high-value data (such as wallet keys) on their Urbit ship.  However, by representing code as valid, an attacker can execute at least on zero-day exploit against a target.
 
-Hoon is moderately robust against overloading the compiler
-virus exploits
+Furthermore, userspace code distribution does not have permission to modify the \lstinline[style=inlinecode]{%base} desk on which the kernel resides.  Permission elevation would not be necessary for an attack, however; malicious code could sidestep the per-desk sandbox mechanism by simply directly issuing cards to Clay to modify \lstinline[style=inlinecode]{%base}'s \lstinline[style=inlinecode]{/sys} files.  Such would be easy to identify in program source, but would require some diligence on the part of users to hedge against.
 
-Example
+Using a social trust mechanism to convince a user to utilize a bad \lstinline[style=inlinecode]{|ota} source is by far the simplest mechanism, however.
 
 \subsection{Signature falsification}
 
 A noun hash is a cryptographic hash of a noun.  Specifically, the SHA-256 \lstinline[style=inlinecode]{++shax} of an atom is typically used, or for cell structures the noun is first \lstinline[style=inlinecode]{++jam}med into an atom before a SHA-128 \lstinline[style=inlinecode]{++shaf} is applied.  Noun hashes are used extensively in Arvo and the vanes to identify values in caches and to compare nouns for equality.
 
+\sloppy
 In principle, signature falsification could lead to invalid cache retrievals, e.g. invoking a malicious gate instead of the intended one.  In practice, userspace code does not have any direct access to the Arvo caches, meaning that while signatures could be falsified, this would require a kernel-level or runtime-level compromise of the system.
 
 \paragraph{Ames packet signature falsification}
@@ -137,119 +155,47 @@ We may dismiss the problem of directly producing a malicious source desk that ha
 
 As with the Ames packet signature falsification, it is more likely for malicious desk distribution to succeed via a special-cased desk than by a hash collission.  This has an inception problem, of course, since the \lstinline[style=inlinecode]{%base} desk must be likewise modified (or the threshold attack described below used).
 
-https://en.wikipedia.org/wiki/SHA-1#SHAttered_%E2%80%93_first_public_collision
+%https://en.wikipedia.org/wiki/SHA-1#SHAttered_%E2%80%93_first_public_collision
 
 \subsection{Compromised compiler}
 
-Example
+As with pattern-matching examples in the exposition, simple or complex pattern-matching to inject and perpetuate malicious code is a possibility given a Turing-complete language and execution platform.  Hoon is of course no exception, so a compromised compiler may alter any outer cores in the current system state and any future nouns produced by the suspected compiler.
 
-What would a compromised compiler look like?
-
-\section{Attacks in Nock}
-
-Urbit does not directly distribute Nock code as executable nouns today.  Any practical attacks based on Nock would require distributing the malicious Nock code as data or inducing a Hoon compiler to produce the malicious Nock code inadvertently.  Such compromised code would then have to executed against an appropriate subject to produce the desired malicious consequence.
-
-Self-modifying Nock code is obviously a concern for reasons similar to 
-
-% [%4 0 1] thing to change commands but can fix using constants?
-
-The Hoon examples above do not
-
-Nock Two
+Source is of course amenable to inspection, but the trusting trust attack is complete once the compiler is compromised.  Thus a compromised compiler is a local problem more than a network-wide risk.  The most sensible detection mechanism is to continue rigorous use of hashes to identify nouns and their source uniquely.
 
 
 \section{Attacks in the Runtime}
 
-Nock is an interpreted language which is evaluated on some particular virtual machine layer.  As of this writing, there are many Nock interpreters \cite{Nock2023} but only two fully instrumented Nock runtimes, Vere and Ares.  Vere is written in C and utilizes a few third-party libraries statically linked into the binary, such as \texttt{libuv}.  Ares is composed in Rust and similarly statically links its modules.  Per the concerns raised by Thompson about a program produced by a compromised compiler, the runtime could in principle be modified to run malicious code either independently of the Arvo instance or in response to side effects induced by the Arvo instance.
+The runtime operates as the computation substrate for Arvo and could execute arbitrary malicious code if compromised.  Nock is an interpreted language which is evaluated on some particular virtual machine layer.  As of this writing, there are many Nock interpreters \cite{Nock2023} but only two fully instrumented Nock runtimes, Vere and Sword (née Ares).  Vere is written in C and utilizes a few third-party libraries statically linked into the binary, such as \texttt{libuv}.  Sword is composed in Rust and similarly statically links its modules.  Per the concerns raised by Thompson about a program produced by a compromised compiler, the runtime could in principle be modified to run malicious code either independently of the Arvo instance or in response to side effects induced by the Arvo instance.
 
 The colloquial wisdom among the Urbit developer community is that if one loses administrative control of one's box (the machine executing the Urbit process), one is already pwned.\footnote{A related problem is that of the security of Azimuth as a public key infrastructure, but we do not address this line of enquiry in this treatment.}  This is saliently illustrated by the Trusting Trust compiler issue, but of course there are less subtle and more
 
-signing
 
-attested enclaves
-
-There is a particular threshold attack which we must consider in detail:  the injection of a Nock Eleven flag (with no Hoon side effects, rather like C \texttt{#pragma}s) that nevertheless triggers exfiltration of sensitive information from the running Arvo instance.  The compromise can be in the runtime but the trigger comes from the Arvo side.
-
-The most salient attack vector on an Urbit ship, of course, is to compromise the cryptography:  emit the private key or enough information for an observer to deduce the key.
-
-
-As Urbit moves towards automated update processes, such as acquiring and booting into new runtimes directly, secure control over the stack—including the build—will assume new prominence.  We hope these reflections will spur more careful consideration of the dangers inherent in running and securing not only Urbit but in fact any computing stack.  Fortunately, proper use of Urbit (including building one's own runtime binary and checking various hashes proactively) can and should make the likelihood of a trusting trust attack as low as possible, since each check in the process makes it increasingly more difficult to propagate malicious code from previous steps correctly.\tombstone{}
-
----
-
-ford is mostly just some invocations of the hoon compiler, some vase-mode operations to modify or combine outputs from the hoon compiler, and caching (because the hoon compiler is slow
-
-we plan to replace the explicit caching with persistent memoization in the runtime, at which point ford will just be a (small) handful of (small) functions
-
-
-categories of quines
-
-Nock evaluation tends to consume values rather than produce them, leading to a naïve difficulty in producing expressions of the same total length as the subject/formula source.  Furthermore, without strings or reentrancy, Nock is not particularly amenable to the easiest methods of quine construction; one popular approach involves string expression replacement.
-% http://www.madore.org/~david/computers/quine.html
-% https://towardsdatascience.com/how-to-write-your-first-quine-program-947f2b7e4a6f
-%  https://archive.is/TGLcp
-
-This suggests that the approach should focus on rules that tend to expand the expression:
+By inducing a user to install a compromised Urbit runtime, an attacker can achieve full control over a user's ship and its computation, perhaps without the user being aware.  Three major components of the runtime could be used to compromise an Arvo instance:
 
 \begin{enumerate}
-  \item  Implicit consing results in a longer expression.  \texttt{*[a [b c] d] → [*[a b c] *[a d]]}
-  \item  The stack push rule, Nock Eight, produces an expanded subject for evaluation.  \texttt{*[a 8 b c] → *[[*[a b] a] c]}
-  \item  The edit rule, Nock Ten, propagates the subject into the result.  \texttt{*[a 10 [b c] d] → #[b *[a c] *[a d]]}
+  \item  Nock evaluation.
+  \item  Cache poisoning.
+  \item  Hint pollution.
 \end{enumerate}
 
-% A common trick is to _jump start_ the quine by writing a program to read a textfile and output an array of numbers. Then you modify it to use a static array, and run the first program against the new (static array) program, producing an array of number that represents the program. Insert that into the static array, run it again until it settles down, and that gets you a quine. _But_, it's tied to a specific character set (== not 100% portable). A program like the above (and not the classic _printf_ hack) will work the same on ASCII or EBCDIC (the classic _printf_ hack fails in EBCDIC because it contains hard-coded ASCII).
+\paragraph{Nock evaluation.}  Nock evaluation in the runtime takes place as some form of bytecode evaluation, rather than evaluating the pure Nock formula.  (Subject-knowledge analysis (\textsc{ska}) further complicates the relationship of on-chip evaluation to the source Nock.)  Nock evaluation could be matched for specific patterns and malicious code executed, or simply
 
-[a 8 b c]
-[[a b] a c]
-*[a [b c] d] → *[[a b c] *[a d]]
-a=[0 1]
-b=[2]
-c=[3 0 1]
-d=[4]
-*[[0 1] [2 3 0 1] 4] → *[[[0 1] 2 3 0 1] 0 1 4]
+\paragraph{Cache poisoning.}  Like Arvo, the runtime uses caches and the event log extensively to hasten referentially transparent evaluation.  We consider two examples, of many possibilities, in which cache poisoning could be used to compromise an Arvo instance.
 
+The first is to compromise the jet state in event playback.  (This is a form of ``hint pollution.'')  Jets formally do ``nothing'' in Arvo and are used as a way of creating impure side effects for the Arvo operating function.  A compromised jet hint would be a Turing-complete compromise, and incorrect matching of an event playback could result in any possible side effect which the runtime can achieve on the host OS.  The user may not be aware of any malicious code execution.  Furthermore, due to the way that Vere's jet dashboard matches code, a registered noun can have its associated jet hint removed in the Hoon source but still be invoked due to noun matching; this is a leaky convention that could lead to jet pollution.
 
+The second is to simply poison known caches such as the remote scry cache.  Malicious code could thus be emitted to a subscriber \emph{without the host even being aware of the poisoned cache value}.  Another upcoming cache susceptible to poisoning is the fastboot cache used to supply compiled nouns in the process of bootstrapping a new ship.  Finally, as explicit caching in Arvo is gradually replace with persistent memoization in the runtime, the runtime and its distribution mechanism will need to be provisioned with security assurances for users.
 
-*[a 11 [b c] d]     *[[*[a c] *[a d]] 0 3]
-a=a
-b=b
-c=[11 b]
-d=[0 3]
-*[[*[a 11 b] *[a 0 3]] 0 3]
+\paragraph{Hint pollution.}  There is a particular threshold attack which we must consider in detail:  the injection of a Nock Eleven flag (with no Hoon side effects, rather like C \texttt{\#pragma}s) that nevertheless triggers malicious code execution or exfiltration of sensitive information from the running Arvo instance.  A hint is a noun that is used to guide the evaluation of a Nock formula.  The compromise can be in the runtime but the trigger in this case comes from the Arvo side.
 
-     ((lambda (x)
-       (list x (list (quote quote) x)))
-      (quote
-         (lambda (x)
-           (list x (list (quote quote) x)))))
+The most salient attack vector on an Urbit ship, of course, is to compromise the cryptography:  emit the Azimuth private key or enough information for an observer to deduce the key.  Several of the foregoing techniques, or several of them together, could be used to achieve this.
 
+In general, of course, the solution is to be paranoid about one's runtime and one's Arvo; if either is discovered to be compromised, it is high time to replace the one and breach the other.
 
-\begin{lstlisting}
-> !=(=/(a 1 |.(\$(a 1))))
-[8 [1 1] [1 9 2 10 [6 1 1] 0 1] 0 1]
-> .*([8 [1 1] [1 9 2 10 [6 1 1] 0 1]] [0 1])
-[8 [1 1] 1 9 2 10 [6 1 1] 0 1]
-> .*([8 [1 1] [1 9 2 10 [6 1 1] 0 1]] [0 1])
-[8 [1 1] 1 9 2 10 [6 1 1] 0 1]
-> .*(. \8 [1 1] [1 9 2 10 [6 1 1] 0 1] [0 1]])
-\end{lstlisting}
+\section{Conclusion}
 
-(setq Q '(lambda (x y) x))
-(setq s11 '(lambda (f x) (list 'lambda '(y) (list f x 'y))))
-(setq n (list 'lambda '(x y) (list Q (list s11 'x 'x) 'y)))
-(setq p (eval (list s11 n n)))
-
-=/  id  |=([x=* y=*] x)
-=/  s11=gate  |=([f=gate x=*] |=(y=* (f x y)))
-=/  n  |=([x=* y=*] (id (s11 x x) y))
-=/  p  (s11 n n)
-(p ~)
-
-A point of evaluation must be decided upon, since a Nock formula that produced an active quine would evaluate forever.
-
-Depending on definitions, one trivial quine is the formula \texttt{[0 1]}, which produces whatever subject it has been handed.
-
-
+As Urbit moves towards automated update processes, such as acquiring and booting into new runtimes directly, secure control over the stack—including the build—will assume new prominence.  We hope these reflections will spur more careful consideration of the dangers inherent in running and securing not only Urbit but in fact any computing stack.  Fortunately, proper use of Urbit (including building one's own runtime binary and checking various hashes proactively) can and should make the likelihood of a trusting trust attack as low as possible, since each check in the process makes it increasingly more difficult to propagate malicious code from previous steps correctly.\tombstone{}
 
 \selectlanguage{USenglish}
 \printbibliography
